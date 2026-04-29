@@ -745,13 +745,12 @@ async function loadPrediction(): Promise<void> {
 // ---- Artist Detail ----
 
 function artistLink(artist: string): string {
-  // Normalize spacing around delimiters
-  let s = artist.replace(/\s*&\s*/g, " & ");
-  s = s.replace(/\s*,\s*/g, ", ");
+  // Normalize spacing around & (only when jammed between words, like "A&B")
+  let s = artist.replace(/(\S)&(\S)/g, "$1 & $2");
   s = s.replace(/\s+/g, " ").trim();
 
-  // Split on join-words, keeping separators
-  const parts = s.split(/( Featuring | Feat\. | Feat | With | And | X | & |, )/);
+  // Split on clear collaboration markers only
+  const parts = s.split(/( Featuring | Feat\. | Feat | With | & )/);
   if (parts.length === 1) {
     const safe = escHtml(artist);
     return `<span class="artist-link" data-artist="${safe}">${safe}</span>`;
@@ -760,9 +759,7 @@ function artistLink(artist: string): string {
     .map((p, i) => {
       const trimmed = p.trim();
       if (!trimmed) return "";
-      // Odd indices are separators
       if (i % 2 === 1) return ` ${escHtml(trimmed)} `;
-      // Even indices are artist names
       return `<span class="artist-link" data-artist="${escHtml(trimmed)}">${escHtml(trimmed)}</span>`;
     })
     .join("");
