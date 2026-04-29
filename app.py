@@ -146,6 +146,17 @@ def api_song(key):
     peak_rank = min(e["rank"] for e in entries)
     peak_weeks = sum(1 for e in entries if e["rank"] == peak_rank)
 
+    # Find year-end rankings for this song
+    ye_ranks = []
+    norm_artist = _normalize_artist(artist)
+    for ye_year, songs in year_end_data.items():
+        for s in songs:
+            if s["title"].lower() == title.lower():
+                ye_artist = _normalize_artist(s["artist"])
+                if ye_artist.lower() == norm_artist.lower():
+                    ye_ranks.append({"year": int(ye_year), "rank": s["rank"]})
+                    break
+
     return jsonify({
         "key": key,
         "title": title,
@@ -155,6 +166,7 @@ def api_song(key):
         "total_weeks": len(entries),
         "first_date": entries[0]["date"],
         "latest_date": entries[-1]["date"],
+        "year_end_ranks": sorted(ye_ranks, key=lambda r: r["year"], reverse=True),
         "chart_run": entries,
     })
 

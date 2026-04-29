@@ -242,6 +242,14 @@ async function loadSong(key) {
         <div class="stat-label">最近入榜</div>
       </div>
     `;
+        // Year-end rankings
+        if (song.year_end_ranks.length > 0) {
+            const yeHtml = song.year_end_ranks.map((r) => `<span class="ye-badge">${r.year} 年榜 #${r.rank}</span>`).join(" ");
+            const yeDiv = document.createElement("div");
+            yeDiv.className = "ye-ranks";
+            yeDiv.innerHTML = `<div class="stat-label" style="margin-bottom:6px">年度榜单排名</div>${yeHtml}`;
+            document.getElementById("song-stats").parentElement.insertBefore(yeDiv, document.getElementById("song-stats").nextSibling);
+        }
         drawTrend(song);
         const tbody = document.querySelector("#history-table tbody");
         tbody.innerHTML = "";
