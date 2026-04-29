@@ -1,0 +1,13 @@
+{
+  "name": "billboard-chart",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "chart.js": "^4.4.0",
+    "typescript": "^5.7.0"
+  }
+}
