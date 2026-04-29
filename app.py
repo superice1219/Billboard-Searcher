@@ -122,37 +122,61 @@ def search_songs(query: str, limit: int = 50) -> list:
     return results[:limit]
 
 
+def _split_artist_names(artist: str) -> list[str]:
+    """Split a collaboration artist string into individual artist names."""
+    # Reverse-normalize: add spaces around jammed delimiters
+    s = re.sub(r"(\S)(Featuring|Feat\.|Feat|With|And|X)(\S)", r"\1 \2 \3", artist, flags=re.IGNORECASE)
+    s = re.sub(r"(\S)&(\S)", r"\1 & \2", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    # Split on collaboration markers
+    parts = re.split(r"\s+(?:Featuring|Feat\.|Feat|With|And|X|&)\s+", s)
+    return [p.strip() for p in parts if p.strip()]
+
+
 def search_artists(query: str) -> list:
-    """Search for artists matching query, with aggregated stats."""
+    """Search for artists matching query, with aggregated stats.
+
+    Collaboration entries (e.g. "A Featuring B & C") count toward
+    each participating artist, not as a separate artist entry.
+    """
     q = query.lower()
     artist_stats: dict[str, dict] = {}
+
     for key in chart_data:
         title, artist = _split_key(key)
-        if q not in artist.lower():
+        # Extract individual artist names from collaboration strings
+        names = _split_artist_names(artist)
+
+        # Check if any individual artist matches the query
+        matched = [n for n in names if q in n.lower()]
+        if not matched:
             continue
-        norm = _normalize_artist(artist)
-        if norm not in artist_stats:
-            artist_stats[norm] = {
-                "name": norm,
-                "total_songs": 0,
-                "number_ones": 0,
-                "top10_hits": 0,
-                "best_peak": 999,
-                "best_title": "",
-            }
-        entry = artist_stats[norm]
-        entry["total_songs"] += 1
+
+        # Aggregate stats for each matching artist
         peak = min(e["rank"] for e in chart_data[key])
-        if peak < entry["best_peak"]:
-            entry["best_peak"] = peak
-            entry["best_title"] = title
-        if peak == 1:
-            entry["number_ones"] += 1
-        if peak <= 10:
-            entry["top10_hits"] += 1
+        for name in matched:
+            key_lower = name.lower()
+            if key_lower not in artist_stats:
+                artist_stats[key_lower] = {
+                    "name": name,
+                    "total_songs": 0,
+                    "number_ones": 0,
+                    "top10_hits": 0,
+                    "best_peak": 999,
+                    "best_title": "",
+                }
+            entry = artist_stats[key_lower]
+            entry["total_songs"] += 1
+            if peak < entry["best_peak"]:
+                entry["best_peak"] = peak
+                entry["best_title"] = title
+            if peak == 1:
+                entry["number_ones"] += 1
+            if peak <= 10:
+                entry["top10_hits"] += 1
 
     results = []
-    for norm, s in artist_stats.items():
+    for s in artist_stats.values():
         results.append({
             "name": s["name"],
             "total_songs": s["total_songs"],
