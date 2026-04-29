@@ -12,8 +12,6 @@ __pycache__/
 # Claude
 .claude/
 
-# Data files (large JSON)
-*.json
 
 # OS
 .DS_Store
