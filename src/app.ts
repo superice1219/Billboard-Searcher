@@ -1,7 +1,11 @@
-import type { Chart as ChartJS } from "chart.js";
-
 // Chart.js loaded via CDN in index.html
-declare const Chart: typeof ChartJS;
+interface ChartInstance {
+  destroy(): void;
+}
+
+declare const Chart: {
+  new (ctx: CanvasRenderingContext2D, config: Record<string, unknown>): ChartInstance;
+};
 
 // ---- Response types ----
 
@@ -70,7 +74,7 @@ interface UpdateCheck {
 interface AppState {
   currentView: string;
   currentSong: string | null;
-  trendChart: ChartJS | null;
+  trendChart: ChartInstance | null;
 }
 
 const state: AppState = {
@@ -387,7 +391,7 @@ function drawTrend(song: SongDetail): void {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => `排名: #${ctx.parsed.y}`,
+            label: (ctx: { parsed: { y: number } }) => `排名: #${ctx.parsed.y}`,
           },
         },
       },
@@ -398,7 +402,7 @@ function drawTrend(song: SongDetail): void {
           max: 100,
           ticks: {
             color: "#888",
-            callback: (v) => (v === 1 ? "#1" : (v as number) % 20 === 0 ? v : ""),
+            callback: (v: number) => (v === 1 ? "#1" : v % 20 === 0 ? v : ""),
           },
           grid: { color: "#222" },
           title: { display: true, text: "排名", color: "#888" },

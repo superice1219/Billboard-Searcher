@@ -1,3 +1,4 @@
+"use strict";
 const state = {
     currentView: "chart",
     currentSong: null,
@@ -628,4 +629,3 @@ function escHtml(s) {
 function toDateStr(d) {
     return d.toISOString().split("T")[0];
 }
-export {};
