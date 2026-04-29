@@ -745,8 +745,22 @@ async function loadPrediction(): Promise<void> {
 // ---- Artist Detail ----
 
 function artistLink(artist: string): string {
-  const safe = escHtml(artist);
-  return `<span class="artist-link" data-artist="${safe}">${safe}</span>`;
+  // Split on join-words: "Featuring", "Feat", "With", "And", "X", "&", ","
+  const parts = artist.split(/( Featuring | Feat\. | Feat | With | And | X | & |, )/);
+  if (parts.length === 1) {
+    const safe = escHtml(artist);
+    return `<span class="artist-link" data-artist="${safe}">${safe}</span>`;
+  }
+  return parts
+    .map((p, i) => {
+      const trimmed = p.trim();
+      if (!trimmed) return "";
+      // Odd indices are separators
+      if (i % 2 === 1) return ` ${escHtml(trimmed)} `;
+      // Even indices are artist names
+      return `<span class="artist-link" data-artist="${escHtml(trimmed)}">${escHtml(trimmed)}</span>`;
+    })
+    .join("");
 }
 
 async function loadArtist(artistName: string): Promise<void> {
