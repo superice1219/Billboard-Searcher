@@ -596,8 +596,12 @@ async function loadPrediction() {
 }
 // ---- Artist Detail ----
 function artistLink(artist) {
-    // Split on join-words: "Featuring", "Feat", "With", "And", "X", "&", ","
-    const parts = artist.split(/( Featuring | Feat\. | Feat | With | And | X | & |, )/);
+    // Normalize spacing around delimiters
+    let s = artist.replace(/\s*&\s*/g, " & ");
+    s = s.replace(/\s*,\s*/g, ", ");
+    s = s.replace(/\s+/g, " ").trim();
+    // Split on join-words, keeping separators
+    const parts = s.split(/( Featuring | Feat\. | Feat | With | And | X | & |, )/);
     if (parts.length === 1) {
         const safe = escHtml(artist);
         return `<span class="artist-link" data-artist="${safe}">${safe}</span>`;
