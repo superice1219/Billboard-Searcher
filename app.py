@@ -104,7 +104,6 @@ def search_songs(query: str, limit: int = 50) -> list:
     for key in chart_data:
         title, artist = _split_key(key)
         if q in title.lower() or q in artist.lower():
-            # Get the latest entry
             entries = chart_data[key]
             latest = entries[-1] if entries else None
             results.append({
@@ -116,12 +115,57 @@ def search_songs(query: str, limit: int = 50) -> list:
                 "total_weeks": len(entries),
                 "peak_rank": min(e["rank"] for e in entries) if entries else None,
             })
-    # Sort by relevance (exact match first, then by latest popularity)
     results.sort(key=lambda r: (
         0 if q == r["title"].lower() else 1,
         r["latest_rank"] or 999,
     ))
     return results[:limit]
+
+
+def search_artists(query: str) -> list:
+    """Search for artists matching query, with aggregated stats."""
+    q = query.lower()
+    artist_stats: dict[str, dict] = {}
+    for key in chart_data:
+        title, artist = _split_key(key)
+        if q not in artist.lower():
+            continue
+        norm = _normalize_artist(artist)
+        if norm not in artist_stats:
+            artist_stats[norm] = {
+                "name": norm,
+                "total_songs": 0,
+                "number_ones": 0,
+                "top10_hits": 0,
+                "best_peak": 999,
+                "best_title": "",
+            }
+        entry = artist_stats[norm]
+        entry["total_songs"] += 1
+        peak = min(e["rank"] for e in chart_data[key])
+        if peak < entry["best_peak"]:
+            entry["best_peak"] = peak
+            entry["best_title"] = title
+        if peak == 1:
+            entry["number_ones"] += 1
+        if peak <= 10:
+            entry["top10_hits"] += 1
+
+    results = []
+    for norm, s in artist_stats.items():
+        results.append({
+            "name": s["name"],
+            "total_songs": s["total_songs"],
+            "number_ones": s["number_ones"],
+            "top10_hits": s["top10_hits"],
+            "best_peak": s["best_peak"],
+            "best_title": s["best_title"],
+        })
+    results.sort(key=lambda r: (
+        0 if q == r["name"].lower() else 1,
+        -r["total_songs"],
+    ))
+    return results
 
 
 # ---- Routes ----
@@ -175,8 +219,11 @@ def api_song(key):
 def api_search():
     q = request.args.get("q", "")
     if len(q) < 1:
-        return jsonify([])
-    return jsonify(search_songs(q))
+        return jsonify({"artists": [], "songs": []})
+    return jsonify({
+        "artists": search_artists(q),
+        "songs": search_songs(q),
+    })
 
 
 @app.route("/api/artist/<path:name>")

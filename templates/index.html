@@ -17,9 +17,8 @@
       <button class="nav-btn" data-view="year-end">年度榜单</button>
       <button class="nav-btn" data-view="ranking">区间排名</button>
       <button class="nav-btn" data-view="predict">年度预测</button>
-      <button class="nav-btn" data-view="search">搜索歌曲</button>
+      <button class="nav-btn" data-view="search">搜索</button>
       <button class="nav-btn" data-view="song" disabled>歌曲走势</button>
-      <button class="nav-btn" data-view="artist" disabled>艺术家</button>
     </nav>
   </div>
 </header>
@@ -163,43 +162,42 @@
     </div>
   </section>
 
-  <!-- Search View -->
+  <!-- Search View (unified: search + artist) -->
   <section id="view-search" class="view">
     <div class="search-box">
-      <input type="text" id="search-input" placeholder="搜索歌曲或艺术家..." autocomplete="off">
+      <input type="text" id="search-input" placeholder="搜索歌曲或歌手..." autocomplete="off">
       <div id="search-results" class="search-results"></div>
     </div>
     <div id="search-empty" class="empty-state">
-      <p>输入关键词搜索 Billboard 历史上的歌曲</p>
+      <p>输入关键词搜索 Billboard 历史上的歌曲和歌手</p>
     </div>
-  </section>
-
-  <!-- Artist Detail View -->
-  <section id="view-artist" class="view">
-    <div class="song-header">
-      <button id="btn-back-artist" class="btn">&larr; 返回</button>
-      <div id="artist-info">
-        <h2 id="artist-name"></h2>
-        <p id="artist-stats-text"></p>
+    <!-- Artist detail shown inline after clicking an artist card -->
+    <div id="search-artist-detail" class="hidden">
+      <button id="btn-back-search" class="btn" style="margin-bottom:16px">&larr; 返回搜索</button>
+      <div class="song-header">
+        <div id="sa-info">
+          <h2 id="sa-name"></h2>
+          <p id="sa-stats-text"></p>
+        </div>
       </div>
+      <div class="song-stats" id="sa-stats"></div>
+      <div class="table-wrap">
+        <table id="sa-table">
+          <thead>
+            <tr>
+              <th class="col-rank">峰值</th>
+              <th class="col-title">歌曲</th>
+              <th class="col-weeks">周数</th>
+              <th class="col-weeks">首次入榜</th>
+              <th class="col-weeks">最近排名</th>
+              <th class="col-action"></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="sa-loading" class="loading hidden">加载中...</div>
     </div>
-    <div class="song-stats" id="artist-stats"></div>
-    <div class="table-wrap">
-      <table id="artist-table">
-        <thead>
-          <tr>
-            <th class="col-rank">峰值</th>
-            <th class="col-title">歌曲</th>
-            <th class="col-weeks">周数</th>
-            <th class="col-weeks">首次入榜</th>
-            <th class="col-weeks">最近排名</th>
-            <th class="col-action"></th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <div id="artist-loading" class="loading hidden">加载中...</div>
   </section>
 
   <!-- Song Detail View -->

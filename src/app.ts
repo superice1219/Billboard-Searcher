@@ -56,6 +56,20 @@ interface SongDetail {
   chart_run: ChartEntry[];
 }
 
+interface ArtistSearchResult {
+  name: string;
+  total_songs: number;
+  number_ones: number;
+  top10_hits: number;
+  best_peak: number;
+  best_title: string;
+}
+
+interface SearchResponse {
+  artists: ArtistSearchResult[];
+  songs: SongResult[];
+}
+
 interface ArtistData {
   artist: string;
   total_songs: number;
@@ -129,9 +143,6 @@ function setupNav(): void {
   document.getElementById("btn-back")!.addEventListener("click", () => {
     switchView("chart");
   });
-  document.getElementById("btn-back-artist")!.addEventListener("click", () => {
-    switchView("chart");
-  });
 }
 
 function switchView(view: string): void {
@@ -141,12 +152,11 @@ function switchView(view: string): void {
 
   if (view === "song") {
     document.getElementById("view-song")!.classList.add("active");
-  } else if (view === "artist") {
-    document.getElementById("view-artist")!.classList.add("active");
-    document.querySelector<HTMLButtonElement>('.nav-btn[data-view="artist"]')!.classList.add("active");
   } else if (view === "search") {
     document.getElementById("view-search")!.classList.add("active");
     document.querySelector<HTMLButtonElement>('.nav-btn[data-view="search"]')!.classList.add("active");
+    // Reset to search mode
+    resetSearchView();
   } else if (view === "year-end") {
     document.getElementById("view-year-end")!.classList.add("active");
     document.querySelector<HTMLButtonElement>('.nav-btn[data-view="year-end"]')!.classList.add("active");
@@ -262,6 +272,19 @@ function setupSearch(): void {
       results.classList.remove("visible");
     }
   });
+
+  // Back-from-artist-detail button
+  document.getElementById("btn-back-search")!.addEventListener("click", () => {
+    resetSearchView();
+  });
+}
+
+function resetSearchView(): void {
+  (document.getElementById("search-input") as HTMLInputElement).value = "";
+  document.querySelector<HTMLElement>(".search-box")!.style.display = "";
+  document.getElementById("search-empty")!.style.display = "block";
+  document.getElementById("search-results")!.classList.remove("visible");
+  document.getElementById("search-artist-detail")!.classList.add("hidden");
 }
 
 async function doSearch(q: string): Promise<void> {
@@ -269,33 +292,69 @@ async function doSearch(q: string): Promise<void> {
   const empty = document.getElementById("search-empty")!;
   try {
     const resp = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-    const songs: SongResult[] = await resp.json();
-    if (songs.length === 0) {
+    const data: SearchResponse = await resp.json();
+
+    if (data.artists.length === 0 && data.songs.length === 0) {
       results.innerHTML =
         '<div class="search-result-item" style="color:var(--text-dim)">无结果</div>';
       empty.style.display = "none";
     } else {
-      results.innerHTML = songs
-        .map(
-          (s) => `
-        <div class="search-result-item" data-key="${escHtml(s.key)}">
-          <div>
-            <div class="search-result-title">${escHtml(s.title)}</div>
-            <div class="search-result-artist">${artistLink(s.artist)}</div>
-          </div>
-          <div class="search-result-meta">
-            最高 #${s.peak_rank} &middot; ${s.total_weeks} 周
-          </div>
-        </div>
-      `
-        )
-        .join("");
+      let html = "";
+
+      // Artist cards
+      if (data.artists.length > 0) {
+        html += '<div class="search-section-label">歌手</div>';
+        data.artists.forEach((a) => {
+          html += `
+            <div class="search-artist-card" data-artist="${escHtml(a.name)}">
+              <div>
+                <div class="search-artist-name">${artistLink(a.name)}</div>
+                <div class="search-artist-desc">${a.total_songs} 首上榜 · ${a.number_ones} 冠 · ${a.top10_hits} Top10</div>
+              </div>
+              <div class="search-result-meta">最高 #${a.best_peak} · ${a.best_title}</div>
+            </div>
+          `;
+        });
+      }
+
+      // Song cards
+      if (data.songs.length > 0) {
+        html += '<div class="search-section-label">歌曲</div>';
+        data.songs.forEach((s) => {
+          html += `
+            <div class="search-result-item" data-key="${escHtml(s.key)}">
+              <div>
+                <div class="search-result-title">${escHtml(s.title)}</div>
+                <div class="search-result-artist">${artistLink(s.artist)}</div>
+              </div>
+              <div class="search-result-meta">
+                最高 #${s.peak_rank} &middot; ${s.total_weeks} 周
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      results.innerHTML = html;
       empty.style.display = "none";
     }
     results.classList.add("visible");
 
+    // Bind artist card clicks
+    results.querySelectorAll<HTMLElement>(".search-artist-card[data-artist]").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        // Don't trigger if clicking on an artist-link inside the card
+        if ((e.target as HTMLElement).closest(".artist-link")) return;
+        results.classList.remove("visible");
+        (document.getElementById("search-input") as HTMLInputElement).value = "";
+        loadArtistInline(card.dataset.artist!);
+      });
+    });
+
+    // Bind song clicks
     results.querySelectorAll<HTMLElement>(".search-result-item[data-key]").forEach((item) => {
-      item.addEventListener("click", () => {
+      item.addEventListener("click", (e) => {
+        if ((e.target as HTMLElement).closest(".artist-link")) return;
         results.classList.remove("visible");
         (document.getElementById("search-input") as HTMLInputElement).value = "";
         loadSong(item.dataset.key!);
@@ -767,13 +826,29 @@ function artistLink(artist: string): string {
 }
 
 async function loadArtist(artistName: string): Promise<void> {
-  const artistBtn = document.querySelector<HTMLButtonElement>('.nav-btn[data-view="artist"]')!;
-  artistBtn.disabled = false;
-  switchView("artist");
-  artistBtn.classList.add("active");
+  // Navigate to search view and show artist detail there
+  switchView("search");
+  document.querySelector<HTMLButtonElement>('.nav-btn[data-view="search"]')!.classList.add("active");
+  showArtistDetail(artistName);
+}
 
-  const loading = document.getElementById("artist-loading")!;
-  const tbody = document.querySelector<HTMLTableSectionElement>("#artist-table tbody")!;
+async function loadArtistInline(artistName: string): Promise<void> {
+  switchView("search");
+  document.querySelector<HTMLButtonElement>('.nav-btn[data-view="search"]')!.classList.add("active");
+  showArtistDetail(artistName);
+}
+
+async function showArtistDetail(artistName: string): Promise<void> {
+  // Hide search box, show artist detail
+  document.querySelector<HTMLElement>(".search-box")!.style.display = "none";
+  document.getElementById("search-empty")!.style.display = "none";
+  document.getElementById("search-results")!.classList.remove("visible");
+
+  const detail = document.getElementById("search-artist-detail")!;
+  detail.classList.remove("hidden");
+
+  const loading = document.getElementById("sa-loading")!;
+  const tbody = document.querySelector<HTMLTableSectionElement>("#sa-table tbody")!;
   tbody.innerHTML = "";
   loading.classList.remove("hidden");
 
@@ -782,11 +857,11 @@ async function loadArtist(artistName: string): Promise<void> {
     if (!resp.ok) throw new Error("Not found");
     const data: ArtistData = await resp.json();
 
-    document.getElementById("artist-name")!.textContent = data.artist;
-    document.getElementById("artist-stats-text")!.textContent =
+    document.getElementById("sa-name")!.textContent = data.artist;
+    document.getElementById("sa-stats-text")!.textContent =
       `${data.total_songs} 首上榜歌曲 · ${data.number_ones} 首冠军单曲 · ${data.top10_hits} 首 Top 10`;
 
-    document.getElementById("artist-stats")!.innerHTML = `
+    document.getElementById("sa-stats")!.innerHTML = `
       <div class="stat-item">
         <div class="stat-value">${data.total_songs}</div>
         <div class="stat-label">上榜歌曲</div>
@@ -821,8 +896,8 @@ async function loadArtist(artistName: string): Promise<void> {
       btn.addEventListener("click", () => loadSong(btn.dataset.key!));
     });
   } catch {
-    document.getElementById("artist-name")!.textContent = "艺术家未找到";
-    document.getElementById("artist-stats-text")!.textContent = "";
+    document.getElementById("sa-name")!.textContent = "歌手未找到";
+    document.getElementById("sa-stats-text")!.textContent = "";
   }
   loading.classList.add("hidden");
 }

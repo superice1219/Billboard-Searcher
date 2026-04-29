@@ -38,9 +38,6 @@ function setupNav() {
     document.getElementById("btn-back").addEventListener("click", () => {
         switchView("chart");
     });
-    document.getElementById("btn-back-artist").addEventListener("click", () => {
-        switchView("chart");
-    });
 }
 function switchView(view) {
     state.currentView = view;
@@ -49,13 +46,11 @@ function switchView(view) {
     if (view === "song") {
         document.getElementById("view-song").classList.add("active");
     }
-    else if (view === "artist") {
-        document.getElementById("view-artist").classList.add("active");
-        document.querySelector('.nav-btn[data-view="artist"]').classList.add("active");
-    }
     else if (view === "search") {
         document.getElementById("view-search").classList.add("active");
         document.querySelector('.nav-btn[data-view="search"]').classList.add("active");
+        // Reset to search mode
+        resetSearchView();
     }
     else if (view === "year-end") {
         document.getElementById("view-year-end").classList.add("active");
@@ -162,37 +157,83 @@ function setupSearch() {
             results.classList.remove("visible");
         }
     });
+    // Back-from-artist-detail button
+    document.getElementById("btn-back-search").addEventListener("click", () => {
+        resetSearchView();
+    });
+}
+function resetSearchView() {
+    document.getElementById("search-input").value = "";
+    document.querySelector(".search-box").style.display = "";
+    document.getElementById("search-empty").style.display = "block";
+    document.getElementById("search-results").classList.remove("visible");
+    document.getElementById("search-artist-detail").classList.add("hidden");
 }
 async function doSearch(q) {
     const results = document.getElementById("search-results");
     const empty = document.getElementById("search-empty");
     try {
         const resp = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-        const songs = await resp.json();
-        if (songs.length === 0) {
+        const data = await resp.json();
+        if (data.artists.length === 0 && data.songs.length === 0) {
             results.innerHTML =
                 '<div class="search-result-item" style="color:var(--text-dim)">无结果</div>';
             empty.style.display = "none";
         }
         else {
-            results.innerHTML = songs
-                .map((s) => `
-        <div class="search-result-item" data-key="${escHtml(s.key)}">
-          <div>
-            <div class="search-result-title">${escHtml(s.title)}</div>
-            <div class="search-result-artist">${artistLink(s.artist)}</div>
-          </div>
-          <div class="search-result-meta">
-            最高 #${s.peak_rank} &middot; ${s.total_weeks} 周
-          </div>
-        </div>
-      `)
-                .join("");
+            let html = "";
+            // Artist cards
+            if (data.artists.length > 0) {
+                html += '<div class="search-section-label">歌手</div>';
+                data.artists.forEach((a) => {
+                    html += `
+            <div class="search-artist-card" data-artist="${escHtml(a.name)}">
+              <div>
+                <div class="search-artist-name">${artistLink(a.name)}</div>
+                <div class="search-artist-desc">${a.total_songs} 首上榜 · ${a.number_ones} 冠 · ${a.top10_hits} Top10</div>
+              </div>
+              <div class="search-result-meta">最高 #${a.best_peak} · ${a.best_title}</div>
+            </div>
+          `;
+                });
+            }
+            // Song cards
+            if (data.songs.length > 0) {
+                html += '<div class="search-section-label">歌曲</div>';
+                data.songs.forEach((s) => {
+                    html += `
+            <div class="search-result-item" data-key="${escHtml(s.key)}">
+              <div>
+                <div class="search-result-title">${escHtml(s.title)}</div>
+                <div class="search-result-artist">${artistLink(s.artist)}</div>
+              </div>
+              <div class="search-result-meta">
+                最高 #${s.peak_rank} &middot; ${s.total_weeks} 周
+              </div>
+            </div>
+          `;
+                });
+            }
+            results.innerHTML = html;
             empty.style.display = "none";
         }
         results.classList.add("visible");
+        // Bind artist card clicks
+        results.querySelectorAll(".search-artist-card[data-artist]").forEach((card) => {
+            card.addEventListener("click", (e) => {
+                // Don't trigger if clicking on an artist-link inside the card
+                if (e.target.closest(".artist-link"))
+                    return;
+                results.classList.remove("visible");
+                document.getElementById("search-input").value = "";
+                loadArtistInline(card.dataset.artist);
+            });
+        });
+        // Bind song clicks
         results.querySelectorAll(".search-result-item[data-key]").forEach((item) => {
-            item.addEventListener("click", () => {
+            item.addEventListener("click", (e) => {
+                if (e.target.closest(".artist-link"))
+                    return;
                 results.classList.remove("visible");
                 document.getElementById("search-input").value = "";
                 loadSong(item.dataset.key);
@@ -618,12 +659,25 @@ function artistLink(artist) {
         .join("");
 }
 async function loadArtist(artistName) {
-    const artistBtn = document.querySelector('.nav-btn[data-view="artist"]');
-    artistBtn.disabled = false;
-    switchView("artist");
-    artistBtn.classList.add("active");
-    const loading = document.getElementById("artist-loading");
-    const tbody = document.querySelector("#artist-table tbody");
+    // Navigate to search view and show artist detail there
+    switchView("search");
+    document.querySelector('.nav-btn[data-view="search"]').classList.add("active");
+    showArtistDetail(artistName);
+}
+async function loadArtistInline(artistName) {
+    switchView("search");
+    document.querySelector('.nav-btn[data-view="search"]').classList.add("active");
+    showArtistDetail(artistName);
+}
+async function showArtistDetail(artistName) {
+    // Hide search box, show artist detail
+    document.querySelector(".search-box").style.display = "none";
+    document.getElementById("search-empty").style.display = "none";
+    document.getElementById("search-results").classList.remove("visible");
+    const detail = document.getElementById("search-artist-detail");
+    detail.classList.remove("hidden");
+    const loading = document.getElementById("sa-loading");
+    const tbody = document.querySelector("#sa-table tbody");
     tbody.innerHTML = "";
     loading.classList.remove("hidden");
     try {
@@ -631,10 +685,10 @@ async function loadArtist(artistName) {
         if (!resp.ok)
             throw new Error("Not found");
         const data = await resp.json();
-        document.getElementById("artist-name").textContent = data.artist;
-        document.getElementById("artist-stats-text").textContent =
+        document.getElementById("sa-name").textContent = data.artist;
+        document.getElementById("sa-stats-text").textContent =
             `${data.total_songs} 首上榜歌曲 · ${data.number_ones} 首冠军单曲 · ${data.top10_hits} 首 Top 10`;
-        document.getElementById("artist-stats").innerHTML = `
+        document.getElementById("sa-stats").innerHTML = `
       <div class="stat-item">
         <div class="stat-value">${data.total_songs}</div>
         <div class="stat-label">上榜歌曲</div>
@@ -668,8 +722,8 @@ async function loadArtist(artistName) {
         });
     }
     catch {
-        document.getElementById("artist-name").textContent = "艺术家未找到";
-        document.getElementById("artist-stats-text").textContent = "";
+        document.getElementById("sa-name").textContent = "歌手未找到";
+        document.getElementById("sa-stats-text").textContent = "";
     }
     loading.classList.add("hidden");
 }
