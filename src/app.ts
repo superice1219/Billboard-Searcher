@@ -745,8 +745,9 @@ async function loadPrediction(): Promise<void> {
 // ---- Artist Detail ----
 
 function artistLink(artist: string): string {
-  // Normalize spacing around & (only when jammed between words, like "A&B")
-  let s = artist.replace(/(\S)&(\S)/g, "$1 & $2");
+  // Normalize spacing when collaboration markers are jammed between words
+  let s = artist.replace(/(\S)(Featuring|Feat\.|Feat|With)(\S)/gi, "$1 $2 $3");
+  s = s.replace(/(\S)&(\S)/g, "$1 & $2");
   s = s.replace(/\s+/g, " ").trim();
 
   // Split on clear collaboration markers only
