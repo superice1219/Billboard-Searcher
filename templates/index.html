@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billboard Hot 100 查询</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="update-banner" class="update-banner hidden"></div>
+<header>
+  <div class="header-inner">
+    <h1>Billboard Hot 100</h1>
+    <nav>
+      <button class="nav-btn active" data-view="chart">本周排名</button>
+      <button class="nav-btn" data-view="year-end">年度榜单</button>
+      <button class="nav-btn" data-view="ranking">区间排名</button>
+      <button class="nav-btn" data-view="predict">年度预测</button>
+      <button class="nav-btn" data-view="search">搜索歌曲</button>
+      <button class="nav-btn" data-view="song" disabled>歌曲走势</button>
+      <button class="nav-btn" data-view="artist" disabled>艺术家</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- Current Chart View -->
+  <section id="view-chart" class="view active">
+    <div class="toolbar">
+      <div class="chart-info">
+        <span id="chart-date"></span>
+        <span id="chart-count"></span>
+      </div>
+      <div class="toolbar-actions">
+        <select id="date-selector"></select>
+        <button id="btn-update" class="btn btn-sm">更新数据</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="chart-table">
+        <thead>
+          <tr>
+            <th class="col-rank">#</th>
+            <th class="col-title">歌曲</th>
+            <th class="col-artist">艺术家</th>
+            <th class="col-weeks">周数</th>
+            <th class="col-action"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="chart-loading" class="loading hidden">加载中...</div>
+  </section>
+
+  <!-- Year-End Chart View -->
+  <section id="view-year-end" class="view">
+    <div class="toolbar">
+      <div class="chart-info">
+        <span id="ye-year-label"></span>
+        <span id="ye-count"></span>
+      </div>
+      <div class="toolbar-actions">
+        <select id="ye-year-selector"></select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="ye-table">
+        <thead>
+          <tr>
+            <th class="col-rank">#</th>
+            <th class="col-title">歌曲</th>
+            <th class="col-artist">艺术家</th>
+            <th class="col-weeks">峰值</th>
+            <th class="col-weeks">周数</th>
+            <th class="col-action"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="ye-loading" class="loading hidden">加载中...</div>
+  </section>
+
+  <!-- Custom Span Ranking View -->
+  <section id="view-ranking" class="view">
+    <div class="toolbar">
+      <div class="chart-info">
+        <span id="rk-label"></span>
+        <span id="rk-count"></span>
+      </div>
+      <div class="toolbar-actions">
+        <input type="date" id="rk-start" class="date-input">
+        <span>~</span>
+        <input type="date" id="rk-end" class="date-input">
+        <button id="rk-go" class="btn btn-sm btn-accent">查询</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="rk-table">
+        <thead>
+          <tr>
+            <th class="col-rank">#</th>
+            <th class="col-title">歌曲</th>
+            <th class="col-artist">艺术家</th>
+            <th class="col-weeks">积分</th>
+            <th class="col-weeks">周数</th>
+            <th class="col-weeks">峰值</th>
+            <th class="col-action"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="rk-loading" class="loading hidden">加载中...</div>
+    <div id="rk-empty" class="empty-state hidden">
+      <p>选择一个时间区间，查看该时段内歌曲的综合排名</p>
+      <p style="font-size:0.85rem;margin-top:8px">算法：累计逆排名积分（#1 = 100分, #100 = 1分）</p>
+    </div>
+  </section>
+
+  <!-- Year-End Prediction View -->
+  <section id="view-predict" class="view">
+    <div class="toolbar">
+      <div class="chart-info">
+        <span id="pr-label"></span>
+        <span id="pr-desc"></span>
+      </div>
+      <div class="toolbar-actions">
+        <select id="pr-year-selector">
+          <option value="2026">2026</option>
+        </select>
+        <button id="pr-go" class="btn btn-sm btn-accent">预测</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="pr-table">
+        <thead>
+          <tr>
+            <th class="col-rank">#</th>
+            <th class="col-title">歌曲</th>
+            <th class="col-artist">艺术家</th>
+            <th class="col-weeks">实际积分</th>
+            <th class="col-weeks">预测积分</th>
+            <th class="col-weeks">总积分</th>
+            <th class="col-action"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="pr-loading" class="loading hidden">加载中...</div>
+    <div id="pr-empty" class="empty-state">
+      <p>基于当前数据预测 2026 年度榜单排名</p>
+      <p style="font-size:0.85rem;margin-top:8px">
+        算法：累计实际积分 + 轨迹衰减模型预测剩余周数积分
+      </p>
+    </div>
+  </section>
+
+  <!-- Search View -->
+  <section id="view-search" class="view">
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="搜索歌曲或艺术家..." autocomplete="off">
+      <div id="search-results" class="search-results"></div>
+    </div>
+    <div id="search-empty" class="empty-state">
+      <p>输入关键词搜索 Billboard 历史上的歌曲</p>
+    </div>
+  </section>
+
+  <!-- Artist Detail View -->
+  <section id="view-artist" class="view">
+    <div class="song-header">
+      <button id="btn-back-artist" class="btn">&larr; 返回</button>
+      <div id="artist-info">
+        <h2 id="artist-name"></h2>
+        <p id="artist-stats-text"></p>
+      </div>
+    </div>
+    <div class="song-stats" id="artist-stats"></div>
+    <div class="table-wrap">
+      <table id="artist-table">
+        <thead>
+          <tr>
+            <th class="col-rank">峰值</th>
+            <th class="col-title">歌曲</th>
+            <th class="col-weeks">周数</th>
+            <th class="col-weeks">首次入榜</th>
+            <th class="col-weeks">最近排名</th>
+            <th class="col-action"></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="artist-loading" class="loading hidden">加载中...</div>
+  </section>
+
+  <!-- Song Detail View -->
+  <section id="view-song" class="view">
+    <div class="song-header">
+      <button id="btn-back" class="btn">&larr; 返回</button>
+      <div id="song-info">
+        <h2 id="song-title"></h2>
+        <p id="song-artist"></p>
+      </div>
+    </div>
+    <div class="song-stats" id="song-stats"></div>
+    <div class="chart-container">
+      <canvas id="trend-chart"></canvas>
+    </div>
+    <div class="table-wrap">
+      <table id="history-table">
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>排名</th>
+            <th>周数</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>数据来源: Billboard.com &middot; <span id="data-range"></span></p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

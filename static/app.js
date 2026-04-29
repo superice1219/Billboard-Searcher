@@ -1,0 +1,679 @@
+const state = {
+  currentView: "chart",
+  currentSong: null,
+  trendChart: null,
+};
+
+// ---- Init ----
+document.addEventListener("DOMContentLoaded", () => {
+  // Global event delegation for artist links (handles all dynamic content)
+  document.body.addEventListener("click", (e) => {
+    const link = e.target.closest(".artist-link");
+    if (link) {
+      e.preventDefault();
+      e.stopPropagation();
+      loadArtist(link.dataset.artist);
+    }
+  });
+
+  setupNav();
+  setupSearch();
+  setupUpdateButton();
+  loadStats();
+  loadYearEndYears();
+  setupPredict();
+
+  // Load chart from existing data first, then check for updates in background
+  loadCurrentChart();
+  loadDates();
+  autoUpdateCheck();
+  setupPredict();
+});
+
+// ---- Navigation ----
+function setupNav() {
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      const view = btn.dataset.view;
+      switchView(view);
+    });
+  });
+  document.getElementById("btn-back").addEventListener("click", () => {
+    switchView("chart");
+  });
+  document.getElementById("btn-back-artist").addEventListener("click", () => {
+    switchView("chart");
+  });
+}
+
+function switchView(view) {
+  state.currentView = view;
+  document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+
+  if (view === "song") {
+    document.getElementById("view-song").classList.add("active");
+  } else if (view === "artist") {
+    document.getElementById("view-artist").classList.add("active");
+    document.querySelector('.nav-btn[data-view="artist"]').classList.add("active");
+  } else if (view === "search") {
+    document.getElementById("view-search").classList.add("active");
+    document.querySelector('.nav-btn[data-view="search"]').classList.add("active");
+  } else if (view === "year-end") {
+    document.getElementById("view-year-end").classList.add("active");
+    document.querySelector('.nav-btn[data-view="year-end"]').classList.add("active");
+    loadYearEndChart();
+  } else if (view === "ranking") {
+    document.getElementById("view-ranking").classList.add("active");
+    document.querySelector('.nav-btn[data-view="ranking"]').classList.add("active");
+    initRankingView();
+  } else if (view === "predict") {
+    document.getElementById("view-predict").classList.add("active");
+    document.querySelector('.nav-btn[data-view="predict"]').classList.add("active");
+  } else {
+    document.getElementById("view-chart").classList.add("active");
+    document.querySelector('.nav-btn[data-view="chart"]').classList.add("active");
+  }
+}
+
+// ---- Current Chart ----
+async function loadCurrentChart(date = null) {
+  const tbody = document.querySelector("#chart-table tbody");
+  const loading = document.getElementById("chart-loading");
+  tbody.innerHTML = "";
+  loading.classList.remove("hidden");
+
+  let url = "/api/current";
+  if (date) url = `/api/chart/${date}`;
+
+  try {
+    const resp = await fetch(url);
+    const songs = await resp.json();
+
+    document.getElementById("chart-date").textContent =
+      date || (songs.length > 0 ? songs[0].rank : "");
+
+    songs.forEach((s) => {
+      const tr = document.createElement("tr");
+      const rankClass = s.rank <= 3 ? ` rank-${s.rank}` : "";
+      tr.innerHTML = `
+        <td class="col-rank"><span class="rank-number${rankClass}">${s.rank}</span></td>
+        <td class="song-title-col">${escHtml(s.title)}</td>
+        <td class="song-artist-col">${artistLink(s.artist)}</td>
+        <td class="col-weeks">${s.weeks}</td>
+        <td class="col-action">
+          <button class="btn-detail" data-key="${escHtml(s.key)}">走势</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("chart-count").textContent =
+      songs.length > 0 ? `${songs.length} 首` : "";
+
+    // Bind detail buttons
+    tbody.querySelectorAll(".btn-detail").forEach((btn) => {
+      btn.addEventListener("click", () => loadSong(btn.dataset.key));
+    });
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="5" class="loading">加载失败</td></tr>';
+  }
+  loading.classList.add("hidden");
+}
+
+// ---- Dates ----
+async function loadDates() {
+  try {
+    const resp = await fetch("/api/dates");
+    const dates = await resp.json();
+    const sel = document.getElementById("date-selector");
+    sel.innerHTML = '<option value="">最新</option>';
+    dates.forEach((d) => {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener("change", () => {
+      loadCurrentChart(sel.value || null);
+    });
+  } catch (err) {
+    console.error("Failed to load dates");
+  }
+}
+
+// ---- Search ----
+function setupSearch() {
+  const input = document.getElementById("search-input");
+  const results = document.getElementById("search-results");
+  let timeout;
+
+  input.addEventListener("input", () => {
+    clearTimeout(timeout);
+    const q = input.value.trim();
+    if (q.length < 1) {
+      results.classList.remove("visible");
+      document.getElementById("search-empty").style.display = "block";
+      return;
+    }
+    timeout = setTimeout(() => doSearch(q), 250);
+  });
+
+  input.addEventListener("focus", () => {
+    if (input.value.trim().length >= 1) {
+      results.classList.add("visible");
+      document.getElementById("search-empty").style.display = "none";
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-box")) {
+      results.classList.remove("visible");
+    }
+  });
+}
+
+async function doSearch(q) {
+  const results = document.getElementById("search-results");
+  const empty = document.getElementById("search-empty");
+  try {
+    const resp = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const songs = await resp.json();
+    if (songs.length === 0) {
+      results.innerHTML =
+        '<div class="search-result-item" style="color:var(--text-dim)">无结果</div>';
+      empty.style.display = "none";
+    } else {
+      results.innerHTML = songs
+        .map(
+          (s) => `
+        <div class="search-result-item" data-key="${escHtml(s.key)}">
+          <div>
+            <div class="search-result-title">${escHtml(s.title)}</div>
+            <div class="search-result-artist">${artistLink(s.artist)}</div>
+          </div>
+          <div class="search-result-meta">
+            最高 #${s.peak_rank} &middot; ${s.total_weeks} 周
+          </div>
+        </div>
+      `
+        )
+        .join("");
+      empty.style.display = "none";
+    }
+    results.classList.add("visible");
+
+    // Bind click
+    results.querySelectorAll(".search-result-item[data-key]").forEach((item) => {
+      item.addEventListener("click", () => {
+        results.classList.remove("visible");
+        document.getElementById("search-input").value = "";
+        loadSong(item.dataset.key);
+      });
+    });
+  } catch (err) {
+    results.innerHTML =
+      '<div class="search-result-item" style="color:var(--red)">搜索失败</div>';
+    results.classList.add("visible");
+  }
+}
+
+// ---- Song Detail ----
+async function loadSong(key) {
+  state.currentSong = key;
+  document.querySelector('.nav-btn[data-view="song"]').disabled = false;
+  switchView("song");
+  document.querySelector('.nav-btn[data-view="song"]').classList.add("active");
+  document.getElementById("btn-back").textContent = "← 返回";
+
+  try {
+    const resp = await fetch(`/api/song/${encodeURIComponent(key)}`);
+    if (!resp.ok) throw new Error("Not found");
+    const song = await resp.json();
+
+    document.getElementById("song-title").textContent = song.title;
+    document.getElementById("song-artist").innerHTML = artistLink(song.artist);
+
+    // Stats
+    document.getElementById("song-stats").innerHTML = `
+      <div class="stat-item">
+        <div class="stat-value">#${song.peak_rank}</div>
+        <div class="stat-label">最高排名</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${song.total_weeks}</div>
+        <div class="stat-label">在榜周数</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${song.first_date}</div>
+        <div class="stat-label">首次入榜</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${song.latest_date}</div>
+        <div class="stat-label">最近入榜</div>
+      </div>
+    `;
+
+    // Trend chart
+    drawTrend(song);
+
+    // History table
+    const tbody = document.querySelector("#history-table tbody");
+    tbody.innerHTML = "";
+    const reversed = [...song.chart_run].reverse();
+    reversed.forEach((e) => {
+      const tr = document.createElement("tr");
+      const rankClass = e.rank <= 3 ? ` rank-${e.rank}` : "";
+      tr.innerHTML = `
+        <td>${e.date}</td>
+        <td><span class="rank-number${rankClass}">${e.rank}</span></td>
+        <td>${e.weeks}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    document.getElementById("song-title").textContent = "歌曲未找到";
+    document.getElementById("song-artist").textContent = "";
+  }
+}
+
+function drawTrend(song) {
+  const ctx = document.getElementById("trend-chart").getContext("2d");
+  if (state.trendChart) state.trendChart.destroy();
+
+  const labels = song.chart_run.map((e) => e.date);
+  const ranks = song.chart_run.map((e) => e.rank);
+
+  state.trendChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "排名",
+          data: ranks,
+          borderColor: "#1db954",
+          backgroundColor: "rgba(29, 185, 84, 0.1)",
+          fill: true,
+          tension: 0.3,
+          pointRadius: ranks.length > 100 ? 0 : 2,
+          pointHitRadius: 8,
+          borderWidth: 2,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `排名: #${ctx.parsed.y}`,
+          },
+        },
+      },
+      scales: {
+        y: {
+          reverse: true,
+          min: 1,
+          max: 100,
+          ticks: {
+            color: "#888",
+            callback: (v) => (v === 1 ? "#1" : v % 20 === 0 ? v : ""),
+          },
+          grid: { color: "#222" },
+          title: { display: true, text: "排名", color: "#888" },
+        },
+        x: {
+          ticks: {
+            color: "#888",
+            maxTicksLimit: 15,
+            maxRotation: 45,
+          },
+          grid: { display: false },
+        },
+      },
+    },
+  });
+}
+
+// ---- Update ----
+function setupUpdateButton() {
+  document.getElementById("btn-update").addEventListener("click", async () => {
+    const btn = document.getElementById("btn-update");
+    btn.textContent = "更新中...";
+    btn.disabled = true;
+    try {
+      const resp = await fetch("/api/update", { method: "POST" });
+      const data = await resp.json();
+      if (data.status === "ok") {
+        btn.textContent = "已触发更新";
+        setTimeout(() => {
+          btn.textContent = "更新数据";
+          btn.disabled = false;
+          loadCurrentChart();
+          loadDates();
+          loadStats();
+        }, 3000);
+      } else {
+        btn.textContent = data.message || "更新失败";
+        btn.disabled = false;
+      }
+    } catch (err) {
+      btn.textContent = "更新失败";
+      btn.disabled = false;
+    }
+  });
+}
+
+// ---- Auto Update Check ----
+async function autoUpdateCheck() {
+  try {
+    const resp = await fetch("/api/check-update");
+    const info = await resp.json();
+    if (!info.outdated) return;
+
+    const banner = document.getElementById("update-banner");
+    const weeks = info.missing_weeks;
+
+    // Show banner
+    banner.className = "update-banner updating";
+    banner.textContent = `检测到 ${weeks} 周新数据，正在自动更新...`;
+    banner.classList.remove("hidden");
+
+    // Trigger update
+    const updateResp = await fetch("/api/update", { method: "POST" });
+    const updateResult = await updateResp.json();
+
+    if (updateResult.status === "ok") {
+      // Poll until update completes (simplified: wait a bit then reload)
+      let attempts = 0;
+      while (attempts < 30) {
+        await sleep(2000);
+        const checkResp = await fetch("/api/check-update");
+        const checkResult = await checkResp.json();
+        if (!checkResult.outdated) {
+          banner.className = "update-banner done";
+          banner.textContent = "数据已更新到最新！";
+          setTimeout(() => banner.classList.add("hidden"), 2500);
+          loadCurrentChart();
+          loadDates();
+          loadStats();
+          return;
+        }
+        attempts++;
+      }
+    }
+    banner.classList.add("hidden");
+  } catch (err) {
+    console.error("Auto-update check failed:", err);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ---- Stats ----
+async function loadStats() {
+  try {
+    const resp = await fetch("/api/stats");
+    const stats = await resp.json();
+    if (stats.date_range[0] && stats.date_range[1]) {
+      document.getElementById("data-range").textContent =
+        `${stats.date_range[0]} ~ ${stats.date_range[1]} · ${stats.total_songs} 首歌曲`;
+    }
+  } catch (err) {
+    /* ignore */
+  }
+}
+
+// ---- Year-End Chart ----
+async function loadYearEndYears() {
+  try {
+    const resp = await fetch("/api/year-end/years");
+    const years = await resp.json();
+    const sel = document.getElementById("ye-year-selector");
+    years.forEach((y) => {
+      const opt = document.createElement("option");
+      opt.value = y;
+      opt.textContent = y;
+      sel.appendChild(opt);
+    });
+    sel.value = years[0] || "";
+    sel.addEventListener("change", () => loadYearEndChart(sel.value));
+  } catch (err) {
+    console.error("Failed to load year-end years");
+  }
+}
+
+async function loadYearEndChart(year = null) {
+  const tbody = document.querySelector("#ye-table tbody");
+  const loading = document.getElementById("ye-loading");
+  tbody.innerHTML = "";
+  loading.classList.remove("hidden");
+
+  if (!year) {
+    const sel = document.getElementById("ye-year-selector");
+    year = sel.value;
+  }
+  if (!year) { loading.classList.add("hidden"); return; }
+
+  try {
+    const resp = await fetch(`/api/year-end/${year}`);
+    if (!resp.ok) throw new Error("Not found");
+    const songs = await resp.json();
+
+    document.getElementById("ye-year-label").textContent = `${year} 年度榜单`;
+    document.getElementById("ye-count").textContent = `${songs.length} 首`;
+
+    songs.forEach((s) => {
+      const tr = document.createElement("tr");
+      const rankClass = s.rank <= 3 ? ` rank-${s.rank}` : "";
+      tr.innerHTML = `
+        <td class="col-rank"><span class="rank-number${rankClass}">${s.rank}</span></td>
+        <td class="song-title-col">${escHtml(s.title)}</td>
+        <td class="song-artist-col">${artistLink(s.artist)}</td>
+        <td class="col-weeks">${s.peak ? "#" + s.peak : "-"}</td>
+        <td class="col-weeks">${s.weeks || "-"}</td>
+        <td class="col-action">
+          <button class="btn-detail" data-key="${escHtml(s.key)}">走势</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll(".btn-detail").forEach((btn) => {
+      btn.addEventListener("click", () => loadSong(btn.dataset.key));
+    });
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">加载失败</td></tr>';
+  }
+  loading.classList.add("hidden");
+}
+
+// ---- Custom Span Ranking ----
+function initRankingView() {
+  // Set default dates: last 3 months
+  const end = new Date();
+  const start = new Date();
+  start.setMonth(start.getMonth() - 3);
+
+  document.getElementById("rk-start").value = toDateStr(start);
+  document.getElementById("rk-end").value = toDateStr(end);
+
+  document.getElementById("rk-go").addEventListener("click", loadSpanRanking);
+}
+
+async function loadSpanRanking() {
+  const start = document.getElementById("rk-start").value;
+  const end = document.getElementById("rk-end").value;
+  if (!start || !end) return;
+
+  const tbody = document.querySelector("#rk-table tbody");
+  const loading = document.getElementById("rk-loading");
+  const empty = document.getElementById("rk-empty");
+  tbody.innerHTML = "";
+  empty.classList.add("hidden");
+  loading.classList.remove("hidden");
+
+  try {
+    const resp = await fetch(`/api/rankings?start=${start}&end=${end}&limit=100`);
+    const data = await resp.json();
+
+    document.getElementById("rk-label").textContent = `${start} ~ ${end}`;
+    document.getElementById("rk-count").textContent = `${data.results.length} 首`;
+
+    data.results.forEach((s, i) => {
+      const tr = document.createElement("tr");
+      const rankClass = (i + 1) <= 3 ? ` rank-${i + 1}` : "";
+      tr.innerHTML = `
+        <td class="col-rank"><span class="rank-number${rankClass}">${i + 1}</span></td>
+        <td class="song-title-col">${escHtml(s.title)}</td>
+        <td class="song-artist-col">${artistLink(s.artist)}</td>
+        <td class="col-weeks">${s.points.toFixed(1)}</td>
+        <td class="col-weeks">${s.weeks_on}</td>
+        <td class="col-weeks">${s.peak_rank ? "#" + s.peak_rank : "-"}</td>
+        <td class="col-action">
+          <button class="btn-detail" data-key="${escHtml(s.key)}">走势</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll(".btn-detail").forEach((btn) => {
+      btn.addEventListener("click", () => loadSong(btn.dataset.key));
+    });
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">加载失败</td></tr>';
+  }
+  loading.classList.add("hidden");
+}
+
+// ---- Year-End Prediction ----
+function setupPredict() {
+  document.getElementById("pr-go").addEventListener("click", loadPrediction);
+}
+
+async function loadPrediction() {
+  const year = document.getElementById("pr-year-selector").value;
+  const tbody = document.querySelector("#pr-table tbody");
+  const loading = document.getElementById("pr-loading");
+  const empty = document.getElementById("pr-empty");
+  tbody.innerHTML = "";
+  empty.classList.add("hidden");
+  loading.classList.remove("hidden");
+
+  try {
+    const resp = await fetch(`/api/predict/${year}`);
+    const data = await resp.json();
+
+    document.getElementById("pr-label").textContent = `${data.year} 年度预测`;
+    document.getElementById("pr-desc").textContent =
+      `追踪期: ${data.tracking_start} ~ ${data.tracking_end} | 最新数据: ${data.latest_date}`;
+
+    data.predictions.forEach((s) => {
+      const tr = document.createElement("tr");
+      const rankClass = s.predicted_rank <= 3 ? ` rank-${s.predicted_rank}` : "";
+      tr.innerHTML = `
+        <td class="col-rank"><span class="rank-number${rankClass}">${s.predicted_rank}</span></td>
+        <td class="song-title-col">${escHtml(s.title)}</td>
+        <td class="song-artist-col">${artistLink(s.artist)}</td>
+        <td class="col-weeks">${s.actual_pts.toFixed(1)}</td>
+        <td class="col-weeks">${s.projected_pts.toFixed(1)}</td>
+        <td class="col-weeks">${s.total_pts.toFixed(1)}</td>
+        <td class="col-action">
+          <button class="btn-detail" data-key="${escHtml(s.key)}">走势</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll(".btn-detail").forEach((btn) => {
+      btn.addEventListener("click", () => loadSong(btn.dataset.key));
+    });
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">加载失败</td></tr>';
+  }
+  loading.classList.add("hidden");
+}
+
+// ---- Helpers ----
+// ---- Artist Detail ----
+function artistLink(artist) {
+  const safe = escHtml(artist);
+  return `<span class="artist-link" data-artist="${safe}">${safe}</span>`;
+}
+
+async function loadArtist(artistName) {
+  state.currentArtist = artistName;
+  document.querySelector('.nav-btn[data-view="artist"]').disabled = false;
+  switchView("artist");
+  document.querySelector('.nav-btn[data-view="artist"]').classList.add("active");
+
+  const loading = document.getElementById("artist-loading");
+  const tbody = document.querySelector("#artist-table tbody");
+  tbody.innerHTML = "";
+  loading.classList.remove("hidden");
+
+  try {
+    const resp = await fetch(`/api/artist/${encodeURIComponent(artistName)}`);
+    if (!resp.ok) throw new Error("Not found");
+    const data = await resp.json();
+
+    document.getElementById("artist-name").textContent = data.artist;
+    document.getElementById("artist-stats-text").textContent =
+      `${data.total_songs} 首上榜歌曲 · ${data.number_ones} 首冠军单曲 · ${data.top10_hits} 首 Top 10`;
+
+    document.getElementById("artist-stats").innerHTML = `
+      <div class="stat-item">
+        <div class="stat-value">${data.total_songs}</div>
+        <div class="stat-label">上榜歌曲</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${data.number_ones}</div>
+        <div class="stat-label">冠军单曲</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">${data.top10_hits}</div>
+        <div class="stat-label">Top 10</div>
+      </div>
+    `;
+
+    data.songs.forEach((s) => {
+      const tr = document.createElement("tr");
+      const peakClass = s.peak_rank <= 3 ? ` rank-${s.peak_rank}` : "";
+      tr.innerHTML = `
+        <td class="col-rank"><span class="rank-number${peakClass}">${s.peak_rank}</span></td>
+        <td class="song-title-col">${escHtml(s.title)}</td>
+        <td class="col-weeks">${s.total_weeks}</td>
+        <td class="col-weeks">${s.first_date}</td>
+        <td class="col-weeks">#${s.latest_rank}</td>
+        <td class="col-action">
+          <button class="btn-detail" data-key="${escHtml(s.key)}">走势</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll(".btn-detail").forEach((btn) => {
+      btn.addEventListener("click", () => loadSong(btn.dataset.key));
+    });
+  } catch (err) {
+    document.getElementById("artist-name").textContent = "艺术家未找到";
+    document.getElementById("artist-stats-text").textContent = "";
+  }
+  loading.classList.add("hidden");
+}
+
+function escHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function toDateStr(d) {
+  return d.toISOString().split("T")[0];
+}
