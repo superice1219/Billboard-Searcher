@@ -30,6 +30,7 @@ interface SongResult {
   weeks_on?: number;
   best_week?: string;
   peak?: number | null;
+  peak_weeks?: number | null;
   actual_pts?: number;
   projected_pts?: number;
   total_pts?: number;
@@ -42,6 +43,7 @@ interface SongDetail {
   title: string;
   artist: string;
   peak_rank: number;
+  peak_weeks: number;
   total_weeks: number;
   first_date: string;
   latest_date: string;
@@ -324,6 +326,10 @@ async function loadSong(key: string): Promise<void> {
         <div class="stat-label">最高排名</div>
       </div>
       <div class="stat-item">
+        <div class="stat-value">${song.peak_weeks}</div>
+        <div class="stat-label">Peak持续</div>
+      </div>
+      <div class="stat-item">
         <div class="stat-value">${song.total_weeks}</div>
         <div class="stat-label">在榜周数</div>
       </div>
@@ -564,6 +570,7 @@ async function loadYearEndChart(year: number | null = null): Promise<void> {
         <td class="song-title-col">${escHtml(s.title)}</td>
         <td class="song-artist-col">${artistLink(s.artist)}</td>
         <td class="col-weeks">${s.peak ? "#" + s.peak : "-"}</td>
+        <td class="col-weeks">${s.peak_weeks ?? "-"}</td>
         <td class="col-weeks">${s.weeks || "-"}</td>
         <td class="col-action">
           <button class="btn-detail" data-key="${escHtml(s.key)}">走势</button>

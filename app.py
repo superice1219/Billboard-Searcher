@@ -143,12 +143,15 @@ def api_song(key):
 
     entries = sorted(chart_data[key], key=lambda e: e["date"])
     title, artist = _split_key(key)
+    peak_rank = min(e["rank"] for e in entries)
+    peak_weeks = sum(1 for e in entries if e["rank"] == peak_rank)
 
     return jsonify({
         "key": key,
         "title": title,
         "artist": artist,
-        "peak_rank": min(e["rank"] for e in entries),
+        "peak_rank": peak_rank,
+        "peak_weeks": peak_weeks,
         "total_weeks": len(entries),
         "first_date": entries[0]["date"],
         "latest_date": entries[-1]["date"],
@@ -313,10 +316,12 @@ def api_year_end(year):
         )
         peak = None
         weeks = None
+        peak_wks = None
         matched_key = norm_key
         if lookup_key:
             entries = chart_data[lookup_key]
             peak = min(e["rank"] for e in entries)
+            peak_wks = sum(1 for e in entries if e["rank"] == peak)
             weeks = len(entries)
             matched_key = lookup_key
         else:
@@ -326,6 +331,7 @@ def api_year_end(year):
         if matched_key:
             entries = chart_data[matched_key]
             peak = min(e["rank"] for e in entries)
+            peak_wks = sum(1 for e in entries if e["rank"] == peak)
             weeks = len(entries)
 
         enriched.append({
@@ -334,6 +340,7 @@ def api_year_end(year):
             "artist": artist,  # normalized for display
             "key": matched_key or norm_key,
             "peak": peak,
+            "peak_weeks": peak_wks,
             "weeks": weeks,
         })
     return jsonify(enriched)

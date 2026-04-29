@@ -226,6 +226,10 @@ async function loadSong(key) {
         <div class="stat-label">最高排名</div>
       </div>
       <div class="stat-item">
+        <div class="stat-value">${song.peak_weeks}</div>
+        <div class="stat-label">Peak持续</div>
+      </div>
+      <div class="stat-item">
         <div class="stat-value">${song.total_weeks}</div>
         <div class="stat-label">在榜周数</div>
       </div>
@@ -450,6 +454,7 @@ async function loadYearEndChart(year = null) {
         <td class="song-title-col">${escHtml(s.title)}</td>
         <td class="song-artist-col">${artistLink(s.artist)}</td>
         <td class="col-weeks">${s.peak ? "#" + s.peak : "-"}</td>
+        <td class="col-weeks">${s.peak_weeks ?? "-"}</td>
         <td class="col-weeks">${s.weeks || "-"}</td>
         <td class="col-action">
           <button class="btn-detail" data-key="${escHtml(s.key)}">走势</button>
