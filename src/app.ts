@@ -584,6 +584,7 @@ async function loadYearEndChart(year: number | null = null): Promise<void> {
 // ---- Custom Span Ranking ----
 
 function initRankingView(): void {
+  // Default: last 3 months
   const end = new Date();
   const start = new Date();
   start.setMonth(start.getMonth() - 3);
@@ -591,7 +592,30 @@ function initRankingView(): void {
   (document.getElementById("rk-start") as HTMLInputElement).value = toDateStr(start);
   (document.getElementById("rk-end") as HTMLInputElement).value = toDateStr(end);
 
-  document.getElementById("rk-go")!.addEventListener("click", loadSpanRanking);
+  document.getElementById("rk-go")!.addEventListener("click", () => {
+    const s = (document.getElementById("rk-start") as HTMLInputElement).value;
+    const e = (document.getElementById("rk-end") as HTMLInputElement).value;
+    document.getElementById("rk-label")!.textContent = `${s} ~ ${e}`;
+    loadSpanRanking();
+  });
+
+  // 即时年榜: Billboard tracking period (Nov 15 of previous year) to today
+  document.getElementById("rk-ytd")!.addEventListener("click", () => {
+    const today = new Date();
+    document.getElementById("rk-label")!.textContent = "即时年榜";
+    (document.getElementById("rk-start") as HTMLInputElement).value = `${today.getFullYear() - 1}-11-15`;
+    (document.getElementById("rk-end") as HTMLInputElement).value = toDateStr(today);
+    loadSpanRanking();
+  });
+
+  // 即时十年榜: current decade start to today
+  document.getElementById("rk-decade")!.addEventListener("click", () => {
+    const today = new Date();
+    document.getElementById("rk-label")!.textContent = "即时十年榜";
+    (document.getElementById("rk-start") as HTMLInputElement).value = `${Math.floor(today.getFullYear() / 10) * 10}-01-01`;
+    (document.getElementById("rk-end") as HTMLInputElement).value = toDateStr(today);
+    loadSpanRanking();
+  });
 }
 
 async function loadSpanRanking(): Promise<void> {
@@ -610,7 +634,6 @@ async function loadSpanRanking(): Promise<void> {
     const resp = await fetch(`/api/rankings?start=${start}&end=${end}&limit=100`);
     const data: { start: string; end: string; results: SongResult[] } = await resp.json();
 
-    document.getElementById("rk-label")!.textContent = `${start} ~ ${end}`;
     document.getElementById("rk-count")!.textContent = `${data.results.length} 首`;
 
     data.results.forEach((s, i) => {
