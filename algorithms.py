@@ -142,6 +142,7 @@ def span_ranking(
     song_weeks: dict[str, int] = defaultdict(int)
     song_peak: dict[str, int] = {}
     song_best_week: dict[str, str] = {}
+    song_peak_weeks: dict[str, int] = defaultdict(int)
 
     for key, entries in chart_data.items():
         # Filter entries in the date range and sort chronologically
@@ -159,6 +160,9 @@ def span_ranking(
             if key not in song_peak or e["rank"] < song_peak[key]:
                 song_peak[key] = e["rank"]
                 song_best_week[key] = e["date"]
+                song_peak_weeks[key] = 1
+            elif e["rank"] == song_peak[key]:
+                song_peak_weeks[key] += 1
 
         # --- Streak bonuses ---
         # Consecutive weeks at #1 compound: real charts reward sustained #1s
@@ -177,6 +181,7 @@ def span_ranking(
             "points": round(points, 1),
             "weeks_on": song_weeks[key],
             "peak_rank": song_peak[key],
+            "peak_weeks": song_peak_weeks[key],
             "best_week": song_best_week[key],
         })
     return results

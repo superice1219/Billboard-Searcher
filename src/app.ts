@@ -653,6 +653,7 @@ async function loadSpanRanking(): Promise<void> {
         <td class="col-weeks">${s.points!.toFixed(1)}</td>
         <td class="col-weeks">${s.weeks_on}</td>
         <td class="col-weeks">${s.peak_rank ? "#" + s.peak_rank : "-"}</td>
+        <td class="col-weeks">${s.peak_weeks ?? "-"}</td>
         <td class="col-action">
           <button class="btn-detail" data-key="${escHtml(s.key)}">走势</button>
         </td>
@@ -664,7 +665,7 @@ async function loadSpanRanking(): Promise<void> {
       btn.addEventListener("click", () => loadSong(btn.dataset.key!));
     });
   } catch {
-    tbody.innerHTML = '<tr><td colspan="7" class="loading">加载失败</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">加载失败</td></tr>';
   }
   loading.classList.add("hidden");
 }
