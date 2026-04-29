@@ -248,7 +248,7 @@ async function loadSong(key) {
             const yeDiv = document.createElement("div");
             yeDiv.className = "ye-ranks";
             yeDiv.innerHTML = `<div class="stat-label" style="margin-bottom:6px">年度榜单排名</div>${yeHtml}`;
-            document.getElementById("song-stats").parentElement.insertBefore(yeDiv, document.getElementById("song-stats").nextSibling);
+            document.getElementById("song-stats").after(yeDiv);
         }
         drawTrend(song);
         const tbody = document.querySelector("#history-table tbody");
