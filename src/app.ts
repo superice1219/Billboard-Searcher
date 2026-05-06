@@ -807,10 +807,11 @@ function artistLink(artist: string): string {
   // Normalize spacing when collaboration markers are jammed between words
   let s = artist.replace(/(\S)(Featuring|Feat\.|Feat|With)(\S)/gi, "$1 $2 $3");
   s = s.replace(/(\S)&(\S)/g, "$1 & $2");
+  s = s.replace(/,(\S)/g, ", $1");
   s = s.replace(/\s+/g, " ").trim();
 
-  // Split on clear collaboration markers only
-  const parts = s.split(/( Featuring | Feat\. | Feat | With | & )/);
+  // Split on collaboration markers and commas
+  const parts = s.split(/( Featuring | Feat\. | Feat | With | & |, (?!Jr\.|Sr\.|Inc\.|Ltd\.|L\.L\.C\.|Corp\.|Co\.|III\b|II\b|IV\b|The |the ))/);
   if (parts.length === 1) {
     const safe = escHtml(artist);
     return `<span class="artist-link" data-artist="${safe}">${safe}</span>`;

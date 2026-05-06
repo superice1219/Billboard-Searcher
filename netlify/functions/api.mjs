@@ -50,12 +50,26 @@ function splitKey(key) {
 }
 
 function splitArtistNames(artist) {
-  // Only split at lowercase→uppercase boundaries (concatenated words like "BryanFeaturingKacey")
+  // Fix jammed delimiters, same logic as Python's _split_artist_names.
+  // The JS regex is already case-sensitive for [a-z]/[A-Z]; only the
+  // delimiter group uses /i via the overall regex flag — but here the
+  // delimiter alternation is in its own group, so /g alone is safe.
   let s = artist.replace(/([a-z])(Featuring|Feat\.|Feat|With|And|X)([A-Z])/g, "$1 $2 $3");
   s = s.replace(/(\S)&(\S)/g, "$1 & $2");
+  s = s.replace(/,(\S)/g, ", $1");
   s = s.replace(/\s+/g, " ").trim();
+  // Split on collaboration markers
   const parts = s.split(/\s+(?:Featuring|Feat\.|Feat|With|And|X|&)\s+/i);
-  return parts.map((p) => p.trim()).filter(Boolean);
+  // Then split each part on commas, skipping known non-separator patterns
+  const result = [];
+  for (const part of parts) {
+    const subParts = part.split(/, (?!Jr\.|Sr\.|Inc\.|Ltd\.|L\.L\.C\.|Corp\.|Co\.|III\b|II\b|IV\b|The |the )/);
+    for (const sp of subParts) {
+      const trimmed = sp.trim();
+      if (trimmed) result.push(trimmed);
+    }
+  }
+  return result;
 }
 
 function normalizeArtist(name) {

@@ -124,14 +124,30 @@ def search_songs(query: str, limit: int = 50) -> list:
 
 def _split_artist_names(artist: str) -> list[str]:
     """Split a collaboration artist string into individual artist names."""
-    # Reverse-normalize: add spaces around jammed delimiters
-    # Only split at lowercase→uppercase boundaries (concatenated words like "BryanFeaturingKacey")
-    s = re.sub(r"([a-z])(Featuring|Feat\.|Feat|With|And|X)([A-Z])", r"\1 \2 \3", artist, flags=re.IGNORECASE)
+    # Fix jammed delimiters: only match lowercase→delimiter→UPPERCASE boundary.
+    # Use inline (?i:…) so case-insensitivity only affects the delimiter,
+    # preventing false matches inside words like "Grande" (r+And+e).
+    s = re.sub(
+        r"([a-z])((?i:Featuring|Feat\.|Feat|With|And|X))([A-Z])",
+        r"\1 \2 \3", artist,
+    )
     s = re.sub(r"(\S)&(\S)", r"\1 & \2", s)
+    s = re.sub(r",(\S)", r", \1", s)
     s = re.sub(r"\s+", " ", s).strip()
     # Split on collaboration markers
-    parts = re.split(r"\s+(?:Featuring|Feat\.|Feat|With|And|X|&)\s+", s)
-    return [p.strip() for p in parts if p.strip()]
+    parts = re.split(r"\s+(?:Featuring|Feat\.|Feat|With|And|X|&)\s+", s, flags=re.IGNORECASE)
+    # Then split each part on commas, skipping known non-separator patterns
+    result = []
+    for part in parts:
+        sub_parts = re.split(
+            r", (?!Jr\.|Sr\.|Inc\.|Ltd\.|L\.L\.C\.|Corp\.|Co\.|III\b|II\b|IV\b|The |the )",
+            part,
+        )
+        for sp in sub_parts:
+            sp = sp.strip()
+            if sp:
+                result.append(sp)
+    return result
 
 
 def search_artists(query: str) -> list:
