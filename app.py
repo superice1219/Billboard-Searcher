@@ -125,7 +125,8 @@ def search_songs(query: str, limit: int = 50) -> list:
 def _split_artist_names(artist: str) -> list[str]:
     """Split a collaboration artist string into individual artist names."""
     # Reverse-normalize: add spaces around jammed delimiters
-    s = re.sub(r"(\S)(Featuring|Feat\.|Feat|With|And|X)(\S)", r"\1 \2 \3", artist, flags=re.IGNORECASE)
+    # Only split at lowercase→uppercase boundaries (concatenated words like "BryanFeaturingKacey")
+    s = re.sub(r"([a-z])(Featuring|Feat\.|Feat|With|And|X)([A-Z])", r"\1 \2 \3", artist, flags=re.IGNORECASE)
     s = re.sub(r"(\S)&(\S)", r"\1 & \2", s)
     s = re.sub(r"\s+", " ", s).strip()
     # Split on collaboration markers
@@ -438,7 +439,7 @@ def _normalize_artist(name: str) -> str:
     """
     # Add space around these join-words when adjacent to words
     for word in ("Featuring", "Feat", "With", "And", "X"):
-        name = re.sub(rf"(\w)({word})(\w)", rf"\1 {word} \3", name)
+        name = re.sub(rf"([a-z])({word})([A-Z])", rf"\1 {word} \3", name)
     # Add space around & when not already spaced
     name = re.sub(r"(\w)&(\w)", r"\1 & \2", name)
     # Add space after comma when not followed by space

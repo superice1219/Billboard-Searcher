@@ -50,7 +50,8 @@ function splitKey(key) {
 }
 
 function splitArtistNames(artist) {
-  let s = artist.replace(/(\S)(Featuring|Feat\.|Feat|With|And|X)(\S)/gi, "$1 $2 $3");
+  // Only split at lowercase→uppercase boundaries (concatenated words like "BryanFeaturingKacey")
+  let s = artist.replace(/([a-z])(Featuring|Feat\.|Feat|With|And|X)([A-Z])/g, "$1 $2 $3");
   s = s.replace(/(\S)&(\S)/g, "$1 & $2");
   s = s.replace(/\s+/g, " ").trim();
   const parts = s.split(/\s+(?:Featuring|Feat\.|Feat|With|And|X|&)\s+/i);
@@ -59,7 +60,7 @@ function splitArtistNames(artist) {
 
 function normalizeArtist(name) {
   for (const word of ["Featuring", "Feat", "With", "And", "X"]) {
-    const re = new RegExp(`(\\w)(${word})(\\w)`, "gi");
+    const re = new RegExp(`([a-z])(${word})([A-Z])`, "gi");
     name = name.replace(re, "$1 $2 $3");
   }
   name = name.replace(/(\w)&(\w)/g, "$1 & $2");
