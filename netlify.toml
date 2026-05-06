@@ -1,0 +1,22 @@
+[build]
+  command = "npm run build && node -e \"const fs=require('fs');fs.copyFileSync('templates/index.html','static/index.html');fs.copyFileSync('billboard_data.json','netlify/functions/billboard_data.json');fs.copyFileSync('billboard_year_end.json','netlify/functions/billboard_year_end.json')\""
+  publish = "static"
+
+[functions]
+  directory = "netlify/functions"
+  included_files = ["billboard_data.json", "billboard_year_end.json"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+
+[[redirects]]
+  from = "/static/*"
+  to = "/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

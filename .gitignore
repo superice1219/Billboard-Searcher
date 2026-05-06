@@ -19,3 +19,9 @@ node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# Netlify build artifacts
+.netlify/
+netlify/functions/billboard_data.json
+netlify/functions/billboard_year_end.json
+static/index.html
