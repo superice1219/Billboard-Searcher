@@ -1,0 +1,51 @@
+name: 更新 Billboard 数据
+
+on:
+  schedule:
+    # 每周二 UTC 08:00（Billboard 通常在周二更新榜单）
+    - cron: "0 8 * * 2"
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: pip install requests beautifulsoup4
+
+      - name: 爬取最新数据
+        run: python update_data.py
+
+      - name: 检查是否有数据更新
+        id: check
+        run: |
+          if git diff --quiet billboard_data.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "没有新的榜单数据"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "检测到新数据"
+          fi
+
+      - name: 提交并推送
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add billboard_data.json
+          git commit -m "data: weekly Billboard chart update ($(date +%Y-%m-%d))"
+          git push
+
+      - name: 触发 Netlify 部署
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          curl -X POST https://api.netlify.com/build_hooks/69faeacb2fc74e0913f62baa
