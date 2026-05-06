@@ -19,8 +19,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: 安装依赖
-        run: pip install requests beautifulsoup4
+        run: |
+          pip install requests beautifulsoup4
+          npm ci
 
       - name: 爬取最新数据
         run: python update_data.py
@@ -45,7 +51,11 @@ jobs:
           git commit -m "data: weekly Billboard chart update ($(date +%Y-%m-%d))"
           git push
 
-      - name: 触发 Netlify 部署
+      - name: 构建并部署到 Netlify
         if: steps.check.outputs.changed == 'true'
         run: |
-          curl -X POST https://api.netlify.com/build_hooks/69faeacb2fc74e0913f62baa
+          npm run build
+          cp templates/index.html static/index.html
+          cp billboard_data.json netlify/functions/billboard_data.json
+          cp billboard_year_end.json netlify/functions/billboard_year_end.json
+          npx netlify deploy --prod --dir=static --functions=netlify/functions --site=${{ secrets.NETLIFY_SITE_ID }} --auth=${{ secrets.NETLIFY_AUTH_TOKEN }}
