@@ -430,7 +430,7 @@ footer {
   /* Table: compact, hide less critical columns */
   table { font-size: 0.78rem; }
   th, td { padding: 7px 8px; }
-  .col-artist, .col-weeks { display: none; }
+  .col-artist { display: none; }
   .col-rank { width: 32px; }
   .btn-detail {
     padding: 3px 8px;
