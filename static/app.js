@@ -333,8 +333,28 @@ function drawTrend(song) {
         labels.push(e.date);
         ranks.push(e.rank);
     }
+    // Custom plugin: draw a faint vertical dashed line at the hovered data point
+    const verticalLinePlugin = {
+        id: "verticalLine",
+        afterDraw(chart) {
+            if (chart.tooltip && chart.tooltip.opacity > 0) {
+                const x = chart.tooltip.caretX;
+                const { top, bottom } = chart.chartArea;
+                chart.ctx.save();
+                chart.ctx.strokeStyle = "rgba(255,255,255,0.3)";
+                chart.ctx.lineWidth = 1;
+                chart.ctx.setLineDash([4, 4]);
+                chart.ctx.beginPath();
+                chart.ctx.moveTo(x, top);
+                chart.ctx.lineTo(x, bottom);
+                chart.ctx.stroke();
+                chart.ctx.restore();
+            }
+        },
+    };
     state.trendChart = new Chart(ctx, {
         type: "line",
+        plugins: [verticalLinePlugin],
         data: {
             labels,
             datasets: [
