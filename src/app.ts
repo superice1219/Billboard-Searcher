@@ -485,6 +485,11 @@ function drawTrend(song: SongDetail): void {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: "nearest",
+        intersect: false,
+        axis: "x",
+      },
       plugins: {
         legend: { display: false },
         tooltip: {

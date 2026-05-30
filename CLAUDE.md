@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 用中文回答。
 - 每次完成代码改动后，主动提交并推送到 GitHub（先检查改动内容，确认无误后 commit + push）。
+- 每次代码逻辑或功能更新后重新部署
 
 ## Build & Run
 
@@ -32,6 +33,7 @@ python year_end_scraper.py     # Full re-scrape of year-end charts (1958–2025)
 **Scraping** — `scraper.py` handles weekly Hot 100 via Billboard's `o-chart-results-list-row` HTML structure. `year_end_scraper.py` handles year-end pages (different DOM layout). Both use requests + BeautifulSoup with a desktop Chrome UA.
 
 **Algorithms** (`algorithms.py`):
+
 1. `span_ranking()` — Accumulates inverse-rank points (101-rank) weighted by position multiplier (#1=2x, top 3=1.5x, etc.) plus streak bonuses for consecutive #1/top-5/top-10 runs.
 2. `predict_year_end()` — YTD actual points + projection model using 4-week rank drift with exponential damping, estimated longevity by position tier. Tracking period: Nov 15 to Nov 15.
 
@@ -39,15 +41,15 @@ python year_end_scraper.py     # Full re-scrape of year-end charts (1958–2025)
 
 ## Routing overview
 
-| Route | Returns |
-|-------|---------|
-| `/api/current` | Latest chart week |
-| `/api/song/<key>` | Single song chart run + stats |
-| `/api/search?q=` | Fuzzy title/artist search |
-| `/api/artist/<name>` | All songs by artist with #1/top10 counts |
-| `/api/chart/<date>` | Chart for a specific Saturday |
-| `/api/rankings?start=&end=` | Custom span ranking |
-| `/api/predict/<year>` | Year-end prediction |
-| `/api/year-end/<year>` | Year-end chart with weekly stats linked |
-| `/api/check-update` | Compare local vs online latest date |
-| `/api/update` POST | Trigger background data refresh |
+| Route                       | Returns                                  |
+| --------------------------- | ---------------------------------------- |
+| `/api/current`              | Latest chart week                        |
+| `/api/song/<key>`           | Single song chart run + stats            |
+| `/api/search?q=`            | Fuzzy title/artist search                |
+| `/api/artist/<name>`        | All songs by artist with #1/top10 counts |
+| `/api/chart/<date>`         | Chart for a specific Saturday            |
+| `/api/rankings?start=&end=` | Custom span ranking                      |
+| `/api/predict/<year>`       | Year-end prediction                      |
+| `/api/year-end/<year>`      | Year-end chart with weekly stats linked  |
+| `/api/check-update`         | Compare local vs online latest date      |
+| `/api/update` POST          | Trigger background data refresh          |
