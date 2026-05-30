@@ -445,8 +445,23 @@ function drawTrend(song: SongDetail): void {
   const ctx = canvas.getContext("2d")!;
   if (state.trendChart) state.trendChart.destroy();
 
-  const labels = song.chart_run.map((e) => e.date);
-  const ranks = song.chart_run.map((e) => e.rank);
+  // Insert null at gap boundaries (re-entries) so the line breaks visually
+  const GAP_DAYS = 14;
+  const labels: (string | null)[] = [];
+  const ranks: (number | null)[] = [];
+  for (let i = 0; i < song.chart_run.length; i++) {
+    const e = song.chart_run[i];
+    if (i > 0) {
+      const prev = new Date(song.chart_run[i - 1].date);
+      const curr = new Date(e.date);
+      if ((curr.getTime() - prev.getTime()) / 86400000 > GAP_DAYS) {
+        labels.push(null);
+        ranks.push(null);
+      }
+    }
+    labels.push(e.date);
+    ranks.push(e.rank);
+  }
 
   state.trendChart = new Chart(ctx, {
     type: "line",
@@ -460,6 +475,7 @@ function drawTrend(song: SongDetail): void {
           backgroundColor: "rgba(29, 185, 84, 0.1)",
           fill: true,
           tension: 0.3,
+          spanGaps: false,
           pointRadius: ranks.length > 100 ? 0 : 2,
           pointHitRadius: 8,
           borderWidth: 2,
